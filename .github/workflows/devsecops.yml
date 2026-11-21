@@ -37,7 +37,9 @@ jobs:
 
       - name: 5. IaC Scanning - Dockerfile, Compose & K8s Manifests (Policy Gate)
         run: |
-          trivy config --severity HIGH,CRITICAL --exit-code 1 Dockerfile docker-compose.yml k8s/
+          trivy config --severity HIGH,CRITICAL --exit-code 1 Dockerfile
+          trivy config --severity HIGH,CRITICAL --exit-code 1 docker-compose.yml
+          trivy config --severity HIGH,CRITICAL --exit-code 1 k8s/
 
       - name: 6. Build Hardened Container Image
         run: |
