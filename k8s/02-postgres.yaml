@@ -51,6 +51,7 @@ spec:
               value: /var/lib/postgresql/data/pgdata
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:
