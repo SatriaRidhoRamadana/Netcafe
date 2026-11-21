@@ -1,0 +1,58 @@
+name: NetCafe DevSecOps Security Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  devsecops-gate:
+    name: Security Scans, SBOM & Policy Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 1. Secret Scanning (Gitleaks Policy Gate)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz -C /usr/local/bin gitleaks
+          gitleaks detect --source . --verbose --redact --exit-code 1
+
+      - name: 2. SAST - Static Application Security Testing (Semgrep)
+        run: |
+          python3 -m pip install --quiet semgrep
+          semgrep scan --config p/javascript --config p/nodejs --error src/
+
+      - name: 3. Install Trivy Scanner
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+
+      - name: 4. SCA - Dependency Vulnerability Scan (Policy Gate)
+        run: |
+          trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 .
+
+      - name: 5. IaC Scanning - Dockerfile, Compose & K8s Manifests (Policy Gate)
+        run: |
+          trivy config --severity HIGH,CRITICAL --exit-code 1 Dockerfile docker-compose.yml k8s/
+
+      - name: 6. Build Hardened Container Image
+        run: |
+          docker build -t netcafe-app:${{ github.sha }} .
+
+      - name: 7. Container Image Scanning (Policy Gate)
+        run: |
+          trivy image --severity HIGH,CRITICAL --exit-code 1 netcafe-app:${{ github.sha }}
+
+      - name: 8. Generate SBOM (CycloneDX Supply Chain Proof)
+        run: |
+          trivy image --format cyclonedx --output sbom-netcafe.cdx.json netcafe-app:${{ github.sha }}
+
+      - name: 9. Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netcafe-sbom-cyclonedx
+          path: sbom-netcafe.cdx.json
