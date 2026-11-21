@@ -3,8 +3,12 @@ FROM node:24-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 
+RUN apk upgrade --no-cache
+
 COPY --chown=node:node package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev \
+  && npm cache clean --force \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 COPY --chown=node:node src ./src
 COPY --chown=node:node database ./database
